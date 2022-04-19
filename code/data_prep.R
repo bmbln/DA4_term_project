@@ -91,8 +91,9 @@ toDeduct <- clean_df %>%
 ambi <- clean_df %>% filter( ambigous == 1 )
 ambi$oevk 
 #we won't able to calculate the votes if 2 shared municipalities are in the same oevk
+#nor in oevk where jobbik18 is missing 
 #it's a problem with some Budapest districts 
-cant_calc <- ambi$oevk[duplicated(ambi$oevk)]
+cant_calc <- unique( c( ambi$oevk[duplicated(ambi$oevk)] , ambi$oevk[is.na(ambi$jobbik18)] ))
 
 oevkTochange <- oevk2018[oevk2018$Választókerület %in% ambi$oevk,] 
 #save to scv what we need to impute manually:
