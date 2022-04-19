@@ -1,0 +1,345 @@
+---
+title: "What happened to Jobbik voters?"
+subtitle: "Data Analysis 4: Term project"
+author: 'Oszkár EGERVÁRI, Péter ENDES-NAGY'
+date: '2022/04/18'
+output: html_document
+---
+
+<style>
+body {
+text-align: justify}
+</style>
+
+```{r setup, include = F}
+knitr::opts_chunk$set( echo = FALSE , warning = FALSE , message = FALSE , cache = TRUE , fig.pos = "!H", out.extra = "")
+options(tinytex.verbose = TRUE)
+# Set graph size
+# knitr::opts_chunk$set(echo = FALSE, out.width = "50%" )#fig.asp = 0.5, fig.width = 7, out.width = "90%" )
+# rm(list=ls())
+
+#libraries
+library(tidyverse)
+library(data.table)
+
+library(huxtable)
+
+library(knitr)
+
+clean_df <- read_csv("https://raw.githubusercontent.com/bmbln/DA4_term_project/main/data/clean/clean_df.csv")
+load( url("https://github.com/bmbln/DA4_term_project/blob/main/data/clean/results.RData?raw=true"))
+```
+
+Parliamentary elections of 2022 took place on the 3rd of April in Hungary. Fidesz, the governing party gained 2/3 in the parliament, their performance was all time high, similar to the 2010 results. The opposition parties allied to mitigate the election system's logic that favors 2 strong opposing blocks. It was a spectacular failure, there is a consensus, that Jobbik, the second strongest party on the 2018 elections lost the most by joining the Opposition Alliance and in general, the opposition performed way worse than in 2018.  
+
+The Opposition Alliance gathered parties from the full spectrum of the political landscape. Jobbik, a far-right party (under transition to a centrist-right party) allied with left-wing and liberal parties, the common cause was 'Fidesz is the common enemy', they tried to build on resentment towards the governing party. This Alliance was heavily debated since Jobbik might be too repulsive for leftist and liberal voters, the left-wing and liberal parties might be too repulsive for (far-)right voters. The Alliance also had a right-wing, earlier rather independent Prime Minister Candidate hoping to attract ex-Fidesz voters.    
+
+Besides Fidesz and the Opposition Alliance, some minor parties participated and a relatively new political force, Mi Hazank, that evolved from the far-right wing of Jobbik after the 2018 elections, mostly building on ex-Jobbik politicians. Mi Hazank reached the 5% threshold that qualified them to get mandates.  
+
+Upon seeing the results and poor performance of the Opposition Alliance, we can ask what happened to Jobbik voters? They voted for the opposition or it was too repulsive for them and decided on Fidesz, Mi Hazank or stayed home? Unfortunately we can't really identify ex-Jobbik voters (that didn't vote for the Alliance), but we can get close to a group of them through Mi Hazank.   
+
+As mentioned earlier, Mi Hazank evolved from the far-right wing of Jobbik, so their voters are likely pre-dominantly ex-Jobbik voters. Mi Hazank might have gathered other voters unsatisfied with Fidesz, especially as the Covid-pandemic took place recently and Mi Hazank was the only party that was against lockdown and vaccination. They might be attractive in general for anti-establishment voters as Jobbik has tended to transit to a centrist-right party the recent years.  
+
+We still can't measure how many ex-Jobbik voters went to Mi Hazank, but we can make a strong assumption that all Mi Hazank voters are ex-Jobbik voters.  
+
+The Alliance might be repulsive for Jobbik voters, we identified a part of them through Mi Hazank. How can we measure the repulsiveness, what variation is in it? In this analysis we focus on a mitigating effect: if the candidate of the Alliance was a Jobbik politician, the Alliance attracted more Jobbik voters.  
+
+Our hypothesis is as follows: if the Opposition Alliance's candidate was a Jobbik politician, Mi Hazank was a less attractive option. 
+
+Measuring the effect of a Jobbik candidate is hard as it's endogenous:   
+
+- choice of alliance candidates was mostly strategic (a pre-election took place earlier, but some candidates rather stepped down). The Alliance likely choose a Jobbik candidate in areas where they is more attractive to Jobbik voters.  
+- other party affiliations of the candidates might have different degree of repulsiveness  
+- it might have also mattered if the Jobbik voters saw that their previous candidate still took a role in the opposition (participated in the pre-election, on the list of the Alliance)  
+- if they saw their 2018 candidate on Mi Hazank's list (or as Mi Hazank candidate in the voting district), they are more likely to vote for Mi Hazank  
+- Fidesz as a (populist) right-wing party can very much be a viable alternative for Jobbik voters  
+- in different municipality types (villages, towns, capital city) the voter behavior is different  
+
+On one hand, the endogeneity calls for using confounders in our models. On the other hand, DiD models can mitigate some effects. Our choice is a kind of DiD model where the y variable is the Mi Hazank's share in 2022 votes proportional to Jobbik's share in 2018 votes. The x variable is a dummy whether the party affiliation of the Alliance's candidate was Jobbik.  
+Other features are used as confounders, see under modelling.  
+
+The code preparing the clean dataset is available here: [(link)](https://github.com/bmbln/DA4_term_project/blob/main/code/data_prep.R).
+The datasets are available here: [(link)](https://github.com/bmbln/DA4_term_project/tree/main/data).
+The model codes (and feature engineering) is available here: [(link)](https://github.com/bmbln/DA4_term_project/blob/main/code/modeling.R).
+
+### Data  
+
+The municipality level data was collected by a Civil Organisation (Atlatszo) from the NVI website and made freely accessible. The 2018 and 2022 datasets had a different data structure and content (on NVI as well) so extensive data transformation was necessary.  
+
+Main issues and decisions (see details in Annex):  
+
+- some municipalities don't follow voting districts (Budapest districts and large towns). We re-calculated the vote numbers from the totals. Some Budapest districts were dropped where calculation was impossible (2 shared district in the same voting district). 
+- 2018 dataset contains the top 3 parties, in roughly 30 municipalities no data on Jobbik votes. Values were imputed manually from valasztas.hu website, in some shared Budapest districts it was impossible without scraping, these were also dropped. Same for the voting district level, Jobbik votes were collected manually. 
+Party affiliation of the Opposition Alliance candidates was collected manually in order to identify Jobbik candidates. The Jobbik 2018 candidates were also cross-checked whether they were  
+
+- on Mi Hazank's party list in 2022
+- same as the Jobbik 2018 candidate 
+- on the part list of the Opposition Alliance
+- Participated on the 2021 pre-election.  
+
+### Cleaning and feature engineering
+As mentioned earlier, we already lost a couple of Budapest districts where we couldn't re-calculate the number of votes coming from a given voting district (an issue, because different voting districts had different candidates with different party-affiliation).  
+
+During the feature engineering, the relevant variables for the DiD model were calculated, most importantly: 
+
+- x: dummy variable if the Opposition-Alliance's candidate was a Jobbik politician and 
+- y: share of Mi Hazank votes in 2022 proportional to share of Jobbik votes in 2018.  
+
+The y variable needed some more transformation and decisions:   
+
+- In some (small) municipalities Mi Hazank had a higher share in 2022 than Jobbik in 2018 (or Jobbik had 0 in 2018). This contradicts our main underlying assumption that Mi Hazank voters are ex-Jobbik voters. In these municipalities, other mechanisms dominated. In order to filter out municipalities with other dominant mechanisms, a decision was made: where Mi Hazank 2022 share was larger than 75% of Jobbik 2018 share, the municipalities were dropped. We run the the models with these municipalities as well and the results are robust enough, so not a relevant loss.    
+- Where both Mi Hazank, both Jobbik had 0 votes, the y was imputed as 0. 
+
+First, let's look at the correlation between Jobbik 2018 and Mi Hazank 2022 performance to see what can we expect from the y variable:  
+
+```{r}
+ggplot(fin_df , aes( jobbik_share18 , mi_hazank_share22  , weight = no_votes22 ) ) +
+  geom_point( size = .2 ) +
+  geom_smooth( method = 'lm' , color = 'navyblue' ) + 
+  labs( title = "Jobbik 2018 performance and Mi Hazank 2022 performance" , 
+        subtitle = "per Municipalities" ,
+        x = "Jobbik votes in 2018 (%)" , 
+        y = "Mi Hanzak votes in 2022 (%)" , 
+        caption = "loess weighted by number of votes in 2022") +
+  xlim(0,75) +
+  ylim(0,75)+
+  theme_bw()
+```
+
+The values are correlated, with `r round( cor( fin_df$jobbik_share18 , fin_df$mi_hazank_share22) , 3 )` correlation coefficient (unweighted value) and the spread around the line is relatively small. 
+
+Extensive feature engineering wasn't necessary as the confounders are binary variables, except for the change in Fidesz share variable.  
+
+```{r}
+ggplot(fin_df , aes( d_fidesz , d_mh_jobbik  , weight = no_votes22 ) ) +
+  geom_point( size = .2 ) +
+  geom_smooth( method = 'loess' , color = 'navyblue' ) + 
+  labs( title = "Fidesz increase and Mi Hazank share of Jobbik 2018 votes" , 
+        subtitle = "per Municipalities" ,
+        x = "Change in Fidesz share of votes (% points)" , 
+        y = "Mi Hanzak share\n proportional to \nJobbik 2018 share (%)" , 
+        caption = "loess weighted by number of votes in 2022") +
+  theme_bw()
+```
+
+From the modeling perspective, the plot implies that the relationship isn't linear, we are better off modeling with lspline at cut-off 0 and 10 (alternative option could be winzorising).  
+The plot itself is very interesting. It suggests that ex-Jobbik voters might have migrated to Fidesz, where Fidesz increased its share in votes, the Mi Hazank votes proportional to Jobbik 2018 was lower.  
+
+Before jumping on modeling, let's also have a look on our main dependent variable, whether the Opposition Alliance's candidate was a Jobbik politician in 2022:  
+```{r}
+ggplot( fin_df , aes( is_jobbik22 , d_mh_jobbik  , weight = no_votes22 ) ) +
+  geom_point( size = .2 ) + 
+  geom_smooth( method = 'lm' , color = 'navyblue') + 
+  labs( title = 'Jobbik candidate in 2022 decreased Mi Hazank performance?' ,
+        subtitle = 'per municipalities' ,
+        caption = 'weighted by number of votes in 2022' , 
+        x = 'Jobbik politician as Alliance candidate \n(left: No, right: Yes)' , 
+        y = "Mi Hanzak share\n proportional to \nJobbik 2018 share (%)" ) +
+  theme_bw() +
+  theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank() )
+```
+
+
+Promising so far, where a Jobbik politician was the candidate of the opposition, the Mi Hazank performance proportional to Jobbik 2018 performance was lower.  
+
+### Modeling  
+In total, we run 7 models. The first model uses our variable of interest only, in Model 2-6 the confounders were included one by one. In the 7th Model, all confounders are included. In the Annex, all regression outputs are displayed, including the coefficients.   
+
+Our y variable in each model is the Mi Hazank's 2022 performance proportional to Jobbik's 2018 performance. The x variable of interest is whether the Alliance candidate's party affiliation was Jobbik.  
+The confounders are as follows:  
+
+- party affiliations: some party might be more repulsive than other  
+- 2018 Jobbik candidate was on the Alliance's list or participated in the pre-election: activity of their previous Jobbik candidate might be more attractive to Jobbik voters and make Mi Hazank less attractive  
+- 2018 Jobbik candidate of the given voting district is on Mi Hazank's list: upon seeing that their previous Jobbik candidate joined Mi Hazank might reinforce the resentment towards the Alliance and makes a voter more likely to vote for Mi Hazank.  
+- Fidesz's relative performance to 2018 (difference in shares): Fidesz simply attracted the ex-Jobbik voters, their attractiveness was stronger than Mi Hazank
+- Municipality type: voter behavior is different 
+
+All models are weighted with the 2022 number of votes on municipality level.  
+
+```{r}
+reg_table <- huxreg( model1 , model2 ,  model3 , model4 , model5 , model6 , model7 ,
+                  statistics = c(N = "nobs" , R2 = "r.squared") , 
+                  coefs = c( "Constant" = "(Intercept)" , 
+                             "Jobbik candidate" = "is_jobbik22" ) )
+
+fin_reg_table <- reg_table %>% 
+  insert_row( c("Other opposion parties", "" , "Yes" , "" , "" , "" , "" , "Yes") , after = 5 ) %>% 
+  insert_row( c("Jobbik 2018 active", "" , "" , "Yes" , "" , "" , "" , "Yes") , after = 6 ) %>% 
+  insert_row( c("Jobbik 2018 in Mi Hazank", "" , "" , "" , "Yes" , "" , "" , "Yes") , after = 7 ) %>% 
+  insert_row( c("Change in Fidesz", "" , "" , "" , "" , "Yes" , "" , "Yes") , after = 8 ) %>% 
+  insert_row( c("Municipality type", "" , "" , "" , "" , "" , "Yes" , "Yes") , after = 9 )
+
+fin_reg_table
+```
+
+In the base model, having a Jobbik politician as the Opposition Alliance candidate decreased the Mi Hazank 2022 share proportional to Jobbik 2018 share by `r round(abs(as.double(substr( as_tibble(fin_reg_table)$model1[[4]] , 1 , 6 ))),2)` percentage point on average. Where the Opposition Alliance's candidate came from another party, the Mi Hazank's share was `r round(abs(as.double(substr( as_tibble(fin_reg_table)$model1[[2]] , 1 , 8 ))),2)`% of Jobbik's 2018 performance. The explanatory power of the model is very weak, the R2 value shows that `r round(as.double(as_tibble(fin_reg_table)$model1[[12]])*100 , 2 )`% of variance in our y is explained by the Jobbik affiliation.  
+The result is robust upon including very high level variables (high level in a sense, that it's the same for the whole voting district), the R2 is also very low across these models as they can't capture variation inside the voting districts.  
+
+- Model2: Other party affiliation actually increases the coefficient. Interesting enough that the UVNP candidate has an even stronger holding back effect (practically one person, Marky-Zay Peter in his voting district), he had to say something to the ex-Jobbik, right-wing voters. Surprisingly, the left-wing candidates had no repulsive effect here, the coefficients aren't significant.  
+- Model3: it doesn't matter if the 2022 candidate is the same as the Jobbik 2018 candidate nor that the Jobbik 2018 was active in the Opposition Alliance, the coefficients aren't significant. A possible interpretation that what matters is the holding back effect of a Jobbik candidate, the ex-Jobbik voters did not appreciate that their ex-representative candidate still remained in the Opposition Alliance without running on the election personally.  
+- Model4: It could be a very strong signal towards the voters that their 2018 Jobbik candidate joined the Mi Hazank list in 2022, but the coefficient isn't significant.  
+
+The results still seem robust, but weaker as we include municipality level confounders: change in Fidesz share and municipality type. Worth noting the sharp increase in R2, municipality level variables are better with capturing variation in y.  
+
+- Model5: How Fidesz performed relative to 2018 is very important as we saw earlier, the ex-Jobbik voters rather voted for Fidesz and a Jobbik candidate in 2022 couldn't mitigate it properly (decrease in coefficient's absolute value).  
+- Model6:  The municipality type also seem to matter, especially in small- and mid-sized towns
+
+Including all confounders, the effect of having a Jobbik politician as the Opposition-Alliance candidate is still in force, but only decreased the Mi Hazank's proportional performance by `r round(abs(as.double(substr( as_tibble(fin_reg_table)$model7[[4]] , 1 , 6 ))),2)` percentage points.  
+
+### Conclusion  
+In this report we investigated if having a Jobbik politician as the Opposition Alliance candidate on the 2022 Hungarian parliamentary election managed to mitigate the repulsiveness of the Alliance for Jobbik voters. More precisely if it resulted in less Mi Hazank (far-right party) votes, as they are the only group of ex-Jobbik voters we can identify.  
+
+We used municipality level data downloaded from a Civil Organization's data collection, the final source of the data is the official votes statistics. Data was extensively transformed and additional datasources were used to manually identify party affiliation and impute missing data.  
+
+We used a DiD model where the dependent variable was the Mi Hazank's share in 2022 votes proportional to Jobbik's share in 2018 votes instead of raw shares. The x variable of interest was the party affiliation (Jobbik or not) of the candidate. Various confounders were included for robustness check.  
+
+The effect of a Jobbik candidate was significant and relatively strong, the effect robust enough as long as we used voting district level confounders (same value for every municipality across districts so weak explanatory force on variation across municipalities). Upon including municipality level confounders (type of municipality and change in Fidesz share), the mitigating effect dramatically decreased, but still significant. The confounders were very limited, so it's relatively likely that including more of them could make our results insignificant, therefore the result isn't robust enough and we can't be sure if it has an effect at all.  
+
+We also identified some interesting other patterns, the 2 most important are: 1) the right-wing Prime Minister candidate was very attractive to Jobbik voters -  in his district, Mi Hazank performed relatively badly - 2) Most ex-Jobbik voters likely choose Fidesz (even as an alternative to Mi Hazank).  
+
+Generalizing our findings is very limited as it's very specific to a particular election and its setting. In the Hungarian context, one problem is that we lost most Budapest districts due to data issues where a considerable share of the population lives. Another problem is that we aren't likely to see a similar election in the future (time factor). The findings are also about right-wing parties, we aren't sure it would be the same on the (far-)left.  
+
+Even though the results aren't robust enough, we can polemicize on the generalization and make recommendations. If such a diverse political Alliance is set up that includes the (ex-far-)right and there is an alternative of the far-right on the political palette, a considerable share of the ex-voters is likely to vote for the alternative. They are also likely to go for another party close to their views (see importance of Fidesz). If a (far-)right-wing party aims to join such a contradicting alliance, having their candidates in strategic voting districts can help with keeping their voters.   
+
+Another limitation of our analysis is that we focused only on the right-wing that wasn't the dominant force in the Alliance. A political strategist should also weight the repulsiveness of the (far-)right for the left and liberal voters.  
+
+## Annex  
+
+### Technical description 
+
+2022 data reading and cleaning
+
+The source of the data as mentioned above is Atlatszo. First the relevant columns were organised into three groups and renamed to English. All the other columns were dropped along with with missing municipality data. Lastly NA values were changed to 0.
+
+Data manipulation
+
+The “other_votes22” column was created by adding up all the votes from parties outside of the group of Fidesz, the Opposition Alliance	and Mi Hazank. Then the “data_issue22” column was created to check if the “no_votes22” column (“ervenyesegyeni” in the original data) was equal to the sum of all the party votes in the respected municipality. Where the “no_votes22” column had wrong data in the original dataset, the values were changed to the correct amount, which is the sum of the votes of all parties.
+
+2018 data reading and cleaning
+
+This dataset had a completely different structure. Votes of Fidesz were always displayed as well as an “all opposition vote count”, where the sum of all non-Fides votes were shown. Other than that, the votes for the top 3 parties were displayed. That means that the votes of Jobbik  wasn’t available for all municipals. As a first step, the data was filtered for these municipals and the data was collected manually.
+The next step was to create a new column for Jobbik votes. Then the column names were translated to English for this table as well, finally the 2018 and 2022 tables were joined.
+
+Creating the final dataset
+
+First we join our dataset of 2018 and 2022 votes with a dataset, where the voting districts are listed for all municipalities. At the same step, we also join this with the party affiliations dataset. This last set contains the candidates and parties for all voting districts for both years, as well as some additional information on the 2018 Jobbik candidates, for example whether they joined the opposition alliance or the far-right Mi Hazank party.
+
+Calculating the correct number of votes for municipalities, that belong to multiple voting districts
+
+Since the municipalities in some cases don’t align with the voting districts (they are flagged as ambiguous in the data), the correct votes had to be calculated for the latter in order to conduct the analysis. 
+
+2018
+
+First we filtered for non-ambiguous data and summed it by voting districts. Then we filtered for the ambiguous data. At the same time, we filtered for those voting districts, which contain 2 shared municipalities or they don’t have votes for Jobbik, as it is not possible to calculate these votes.
+
+Then the table was created containing the ambiguous voting districts from which we need to deduct the non-ambiguous districts’ votes. To do this, the two tables were joined along with some missing Jobbik votes. Lastly the columns with the correct values were created by deducting the appropriate columns.
+
+For the 2022 data the process was the same, except no votes had to be imputed.
+
+### Model 1
+
+```{r}
+huxreg(    model1,   
+statistics = c(N = "nobs" , R2 = "r.squared") , 
+coefs = c( "Constant" = "(Intercept)" , 
+"Jobbik candidate" = "is_jobbik22" ) )
+```
+
+### Model 2
+
+```{r}
+huxreg(    model2,   
+statistics = c(N = "nobs" , R2 = "r.squared") ,
+coefs = c( "Constant" = "(Intercept)" ,
+"Jobbik candidate" = "is_jobbik22",
+"DK candidate" = "is_DK22",
+"LMP candidate" = "is_LMP22",
+"Momentum candidate" = "is_MOMENTUM22",
+"Parbeszed candidate" = "is_PARBESZED22",
+"Other candidate" = "is_UVNP22"
+) )
+```
+
+### Model 3
+
+```{r}
+huxreg(    model3,   
+statistics = c(N = "nobs" , R2 = "r.squared") ,
+coefs = c( "Constant" = "(Intercept)" ,
+"Jobbik candidate" = "is_jobbik22",
+"Opposition candidate was a 2018 Jobbik candidate" = "opp22is_jobbik18",
+"2018 Jobbik candidate was a candidate in 2022 as well" = "jobbik18_active"
+) )
+```
+
+### Model 4
+
+```{r}
+
+huxreg(    model4,   
+statistics = c(N = "nobs" , R2 = "r.squared") , 
+coefs = c( "Constant" = "(Intercept)" , 
+"Jobbik candidate" = "is_jobbik22" ,
+"2018 Jobbik candidate was a 2022 Mi Hazank candidate" = "jobbik18on_mihazank22list"
+) )
+```
+### Model 5
+
+```{r}
+
+huxreg(    model5,   
+statistics = c(N = "nobs" , R2 = "r.squared") , 
+coefs = c( "Constant" = "(Intercept)" , 
+"Jobbik candidate" = "is_jobbik22" ,
+"Change in Fidesz votes below 0 (%)" = "lspline(d_fidesz, c(0, 10))1",
+"Change in Fidesz votes 0-10 (%)" = "lspline(d_fidesz, c(0, 10))2",
+"Change in Fidesz votes above 10 (%)" = "lspline(d_fidesz, c(0, 10))3"
+) )
+```
+
+### Model 6
+With the municipality types, Budapest is the default (ad.factor). 
+```{r}
+
+huxreg(    model6,   
+statistics = c(N = "nobs" , R2 = "r.squared") , 
+coefs = c( "Constant" = "(Intercept)" , 
+"Jobbik candidate" = "is_jobbik22" ,
+"Village" = "m_typeFalu",
+"Small town" = "m_typeKisváros",
+"Average sized town" = "m_typeKözépváros",
+"City" = "m_typeNagyváros"
+) )
+```
+### Model 7
+With the municipality types, Budapest is the default (ad.factor). 
+```{r}
+
+huxreg(    model7,   
+statistics = c(N = "nobs" , R2 = "r.squared") , 
+coefs = c( "Constant" = "(Intercept)" , 
+"Jobbik candidate" = "is_jobbik22" ,
+"Change in Fidesz votes below 0 (%)" = "lspline(d_fidesz, c(0, 10))1",
+"Change in Fidesz votes 0-10 (%)" = "lspline(d_fidesz, c(0, 10))2",
+"Change in Fidesz votes above 10 (%)" = "lspline(d_fidesz, c(0, 10))3",
+"DK candidate" = "is_DK22",
+"LMP candidate" = "is_LMP22",
+"Momentum candidate" = "is_MOMENTUM22",
+"Parbeszed candidate" = "is_PARBESZED22",
+"Other candidate" = "is_UVNP22",
+"Opposition candidate was a 2018 Jobbik candidate" = "opp22is_jobbik18",
+"2018 Jobbik candidate was a candidate in 2022 as well" = "jobbik18_active",
+"2018 Jobbik candidate was a 2022 Mi Hazank candidate" = "jobbik18on_mihazank22list",
+"Village" = "m_typeFalu",
+"Small town" = "m_typeKisváros",
+"Average sized town" = "m_typeKözépváros",
+"City" = "m_typeNagyváros"
+) )
+```
+
+
+
+
+
+
